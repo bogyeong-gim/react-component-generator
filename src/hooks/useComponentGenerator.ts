@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { GeneratedComponent, Provider } from '../types';
+import { readStoredValue, STORAGE_KEYS, writeStoredValue } from '../utils/storage';
 
 interface UseComponentGeneratorReturn {
   components: GeneratedComponent[];
@@ -10,10 +11,26 @@ interface UseComponentGeneratorReturn {
   clearAll: () => void;
 }
 
+type StoredComponent = Omit<GeneratedComponent, 'createdAt'> & { createdAt: string };
+
+function loadStoredComponents(): GeneratedComponent[] {
+  const stored = readStoredValue<StoredComponent[]>(STORAGE_KEYS.components, []);
+  if (!Array.isArray(stored)) return [];
+
+  return stored.flatMap((component) => {
+    const createdAt = new Date(component.createdAt);
+    return Number.isNaN(createdAt.getTime()) ? [] : [{ ...component, createdAt }];
+  });
+}
+
 export function useComponentGenerator(): UseComponentGeneratorReturn {
-  const [components, setComponents] = useState<GeneratedComponent[]>([]);
+  const [components, setComponents] = useState<GeneratedComponent[]>(loadStoredComponents);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.components, components);
+  }, [components]);
 
   const generate = useCallback(async (prompt: string, apiKey: string | undefined, provider: Provider) => {
     setIsLoading(true);
