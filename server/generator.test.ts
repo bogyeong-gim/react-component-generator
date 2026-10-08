@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stripCodeFences, ensureRenderCall } from './generator';
+import { stripCodeFences, ensureRenderCall, validatePromptLength } from './generator';
 
 describe('stripCodeFences', () => {
   it('언어 태그가 붙은 코드펜스를 제거한다', () => {
@@ -36,5 +36,15 @@ describe('ensureRenderCall', () => {
   it('대문자로 시작하는 컴포넌트 선언이 없으면 원본을 그대로 반환한다', () => {
     const code = 'const value = 42;';
     expect(ensureRenderCall(code)).toBe(code);
+  });
+});
+
+describe('validatePromptLength', () => {
+  it('500자 프롬프트를 허용한다', () => {
+    expect(validatePromptLength('a'.repeat(500))).toBeNull();
+  });
+
+  it('501자 프롬프트를 거부한다', () => {
+    expect(validatePromptLength('a'.repeat(501))).toBe('프롬프트는 500자 이내로 입력해주세요.');
   });
 });
