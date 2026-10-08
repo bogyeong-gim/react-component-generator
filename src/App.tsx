@@ -3,6 +3,7 @@ import { PromptInput } from './components/PromptInput';
 import { ComponentCard } from './components/ComponentCard';
 import { useComponentGenerator } from './hooks/useComponentGenerator';
 import type { Provider } from './types';
+import { readStoredValue, STORAGE_KEYS, writeStoredValue } from './utils/storage';
 import './App.css';
 
 const PROVIDER_CONFIG = {
@@ -11,9 +12,15 @@ const PROVIDER_CONFIG = {
 } as const;
 
 function App() {
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(() => readStoredValue(STORAGE_KEYS.apiKey, ''));
   const [showKey, setShowKey] = useState(false);
-  const [provider, setProvider] = useState<Provider>('google');
+  const [provider, setProvider] = useState<Provider>(() => {
+    const storedProvider = readStoredValue<Provider>(STORAGE_KEYS.provider, 'google');
+    return storedProvider === 'anthropic' || storedProvider === 'google' ? storedProvider : 'google';
+  });
+  const [promptHistory, setPromptHistory] = useState(() =>
+    readStoredValue<string[]>(STORAGE_KEYS.promptHistory, []),
+  );
   const [envKeys, setEnvKeys] = useState<Record<Provider, boolean>>({
     anthropic: false,
     google: false,
@@ -28,6 +35,18 @@ function App() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.apiKey, apiKey);
+  }, [apiKey]);
+
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.provider, provider);
+  }, [provider]);
+
+  useEffect(() => {
+    writeStoredValue(STORAGE_KEYS.promptHistory, promptHistory);
+  }, [promptHistory]);
+
   const hasEnvKey = envKeys[provider];
 
   const handleGenerate = (prompt: string) => {
@@ -35,6 +54,7 @@ function App() {
       alert(`${PROVIDER_CONFIG[provider].label} API 키를 입력하거나 .env에 설정해주세요.`);
       return;
     }
+    setPromptHistory((history) => [prompt, ...history.filter((item) => item !== prompt)].slice(0, 10));
     generate(prompt, apiKey || undefined, provider);
   };
 
@@ -68,7 +88,7 @@ function App() {
 
       <main className="workspace">
         <section className="composer-panel" aria-label="컴포넌트 생성">
-          <PromptInput onGenerate={handleGenerate} isLoading={isLoading} />
+          <PromptInput onGenerate={handleGenerate} isLoading={isLoading} history={promptHistory} />
         </section>
 
         <aside className="settings-panel" aria-label="실행 설정">
