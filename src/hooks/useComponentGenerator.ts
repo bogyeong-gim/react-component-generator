@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { GeneratedComponent, Provider } from '../types';
+import { readGenerationStream } from './stream';
 
 interface UseComponentGeneratorReturn {
   components: GeneratedComponent[];
@@ -18,6 +19,15 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
   const generate = useCallback(async (prompt: string, apiKey: string | undefined, provider: Provider) => {
     setIsLoading(true);
     setError(null);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const pendingComponent: GeneratedComponent = {
+      id,
+      prompt,
+      code: '',
+      createdAt: new Date(),
+      status: 'streaming',
+    };
+    setComponents((prev) => [pendingComponent, ...prev]);
 
     try {
       const res = await fetch('/api/generate', {
@@ -26,21 +36,24 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
         body: JSON.stringify({ prompt, ...(apiKey && { apiKey }), provider }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || 'Failed to generate component');
       }
 
-      const newComponent: GeneratedComponent = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        prompt,
-        code: data.code,
-        createdAt: new Date(),
-      };
-
-      setComponents((prev) => [newComponent, ...prev]);
+      if (!res.body) throw new Error('생성 스트림을 읽을 수 없습니다.');
+      const code = await readGenerationStream(res.body, (text) => {
+        setComponents((prev) => prev.map((component) =>
+          component.id === id
+            ? { ...component, code: component.code + text }
+            : component,
+        ));
+      });
+      setComponents((prev) => prev.map((component) =>
+        component.id === id ? { ...component, code, status: 'complete' } : component,
+      ));
     } catch (err) {
+      setComponents((prev) => prev.filter((component) => component.id !== id));
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
     } finally {

@@ -12,8 +12,14 @@ interface ComponentCardProps {
 
 type Tab = 'preview' | 'code';
 
-export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: ComponentCardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('preview');
+export function ComponentCard(props: ComponentCardProps) {
+  return <ComponentCardContent key={props.component.status} {...props} />;
+}
+
+function ComponentCardContent({ component, onRemove, onRegenerate, isLoading }: ComponentCardProps) {
+  const [activeTab, setActiveTab] = useState<Tab>(
+    component.status === 'streaming' ? 'code' : 'preview',
+  );
   const [previewKey, setPreviewKey] = useState(0);
   const createdAt = component.createdAt.toLocaleTimeString('ko-KR', {
     hour: '2-digit',
